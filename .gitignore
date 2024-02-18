@@ -1,3 +1,11 @@
+a.out
+wol
+wol.exe
+*.o
+*.out
+.depend
+.gdbinit
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

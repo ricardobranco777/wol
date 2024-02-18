@@ -1,5 +1,20 @@
-BIN=wol.py
-FILES=$(BIN)
+BIN	= wol
+CC	= gcc
+CFLAGS	= -Wall -O2
+LDFLAGS	=
+
+FILES	= wol.py
+OSTYPE	!= uname
+ifeq ($(OSTYPE),SunOS)
+LDFLAGS	+= -lsocket
+endif
+
+$(BIN):	$(BIN).c
+	@$(CC) -o $@ $(BIN).c $(LDFLAGS)
+
+.PHONY: clean
+clean:
+	@rm -f $(BIN)
 
 .PHONY: all
 all: pylint mypy black
