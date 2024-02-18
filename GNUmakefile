@@ -1,0 +1,24 @@
+BIN	= wol
+CC	?= gcc
+CFLAGS	= -Wall -Wextra -O2
+LDFLAGS	=
+
+OSTYPE	!= uname
+ifeq ($(OSTYPE),SunOS)
+LDFLAGS	+= -lsocket
+endif
+
+$(BIN):	$(BIN).c
+	$(CC) -o $@ $(BIN).c $(LDFLAGS) $(CFLAGS)
+
+.PHONY: clean
+clean:
+	$(RM) $(BIN)
+
+.PHONY: install
+install:
+	install -s -m 0755 $(BIN) /usr/local/bin/ 2>/dev/null || install -s -m 0755 $(BIN) $(HOME)/bin/
+
+.PHONY: uninstall
+uninstall:
+	rm -f /usr/local/bin/$(BIN) 2>/dev/null || rm -f $(HOME)/bin/$(BIN)
