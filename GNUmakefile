@@ -1,4 +1,4 @@
-BIN=wol
+BIN=wol.py
 FILES=$(BIN)
 
 .PHONY: all
