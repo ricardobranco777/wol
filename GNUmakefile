@@ -33,7 +33,7 @@ black:
 
 .PHONY: install
 install:
-	install -s -m 0755 $(BIN) /usr/local/bin/ 2>/dev/null || install -m 0755 $(BIN) $(HOME)/bin/
+	install -s -m 0755 $(BIN) /usr/local/bin/ 2>/dev/null || install -s -m 0755 $(BIN) $(HOME)/bin/
 
 .PHONY: uninstall
 uninstall:
