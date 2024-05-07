@@ -67,7 +67,8 @@ wake_on_lan(const char *mac_address) {
 	if (sock < 0)
 		err(1, "%s", "socket");
 
-	if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &(int){1}, sizeof(int)) < 0)
+	int on = 1;
+	if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof(int)) < 0)
 		err(1, "%s", "setsockopt");
 
 	printf("Sending to %02x:%02x:%02x:%02x:%02x:%02x\n",
