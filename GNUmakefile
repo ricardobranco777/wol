@@ -1,35 +1,19 @@
 BIN	= wol
-CC	= gcc
-CFLAGS	= -Wall -O2
+CC	?= gcc
+CFLAGS	= -Wall -Wextra -O2
 LDFLAGS	=
 
-FILES	= wol.py
 OSTYPE	!= uname
 ifeq ($(OSTYPE),SunOS)
 LDFLAGS	+= -lsocket
 endif
 
 $(BIN):	$(BIN).c
-	@$(CC) -o $@ $(BIN).c $(LDFLAGS)
+	$(CC) -o $@ $(BIN).c $(LDFLAGS) $(CFLAGS)
 
 .PHONY: clean
 clean:
-	@rm -f $(BIN)
-
-.PHONY: all
-all: pylint mypy black
-
-.PHONY: pylint
-pylint:
-	@pylint $(FILES)
-
-.PHONY: mypy
-mypy:
-	@mypy $(FILES)
-
-.PHONY: black
-black:
-	@black --check $(FILES)
+	$(RM) $(BIN)
 
 .PHONY: install
 install:
