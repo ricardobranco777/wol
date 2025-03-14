@@ -1,6 +1,8 @@
 a.out
 wol
 wol.exe
+iface/iface
+iface/iface.exe
 *.o
 *.out
 .depend
