@@ -3,90 +3,93 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include <ctype.h>
+#if defined(__linux__)
+#include <netinet/ether.h>
+#elif defined(__FreeBSD__) || defined(__DragonFly__)
+#include <net/ethernet.h>
+#define	ether_addr_octet octet
+#elif defined(__sun__)
+#include <net/ethernet.h>
+#elif defined(__NetBSD__)
+#include <net/if.h>
+#include <net/if_ether.h>
+#elif defined(__OpenBSD__)
+#include <net/if.h>
+#include <netinet/if_ether.h>
+#else
+#error not supported
+#endif
+
 #include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#define MAX_TRIES 10
+#ifdef __linux__
+extern char *__progname;
+#define getprogname()   (__progname)
+#endif
 
 static int
-xdigit (char c)
+resolve_mac(const char *input, uint8_t *mac)
 {
-	if (c >= '0' && c <= '9')
-		return (c - '0');
-	c |= 0x20; // c = tolower(c);
-	if (c >= 'a' && c <= 'f')
-		return (10 + c - 'a');
-	return (-1);
-}
+	struct ether_addr *eth;
 
-static uint8_t *
-ether_str2addr(const char *str, uint8_t *addr)
-{
-	int v, x;
-
-	for (int i = 0; i < 6; i++) {
-		if ((x = xdigit(*str++)) < 0)
-			return NULL;
-		v = x << 4;
-		if ((x = xdigit(*str++)) < 0)
-			return NULL;
-		v |= x;
-		addr[i] = v;
-		if (i < 5 && !isxdigit((int)*str))
-			str++;
+	struct ether_addr eth_resolved;
+	if (ether_hostton(input, &eth_resolved) == 0) {
+		memcpy(mac, eth_resolved.ether_addr_octet, 6);
+		return 0;
 	}
-	if (*str != '\0')
-		return NULL;
 
-	return addr;
+	if ((eth = ether_aton(input)) != NULL) {
+		memcpy(mac, eth->ether_addr_octet, 6);
+		return 0;
+	}
+
+	return -1;
 }
 
 static void
-wake_on_lan(const char *mac_address) {
+wake_on_lan(const char *target) {
+	struct sockaddr_in sa;
 	uint8_t payload[102];
 	uint8_t mac[6];
+	unsigned int i;
+	int on = 1;
+	int sock;
 
-	if (ether_str2addr(mac_address, mac) == NULL)
-		errx(1, "Invalid MAC address: %s", mac_address);
+	if (resolve_mac(target, mac) == -1)
+		errx(1, "Invalid MAC address or hostname: %s", target);
 
 	memset(payload, 0xFF, 6);
-	for (unsigned int i = 6; i < sizeof(payload); i += 6)
+	for (i = 6; i < sizeof(payload); i += 6)
 		memcpy(payload + i, mac, 6);
 
-	struct sockaddr_in sa;
 	memset(&sa, 0, sizeof(sa));
 	sa.sin_family = AF_INET;
 	sa.sin_port = htons(9);
 	inet_pton(AF_INET, "255.255.255.255", &sa.sin_addr);
 
-	int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (sock < 0)
-		err(1, "%s", "socket");
+	if ((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+		err(1, "socket");
 
-	int on = 1;
-	if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof(int)) < 0)
-		err(1, "%s", "setsockopt");
+	if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof(int)) == -1)
+		err(1, "setsockopt");
 
 	printf("Sending to %02x:%02x:%02x:%02x:%02x:%02x\n",
 		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
-	for (int i = 0; i < MAX_TRIES; i++)
-		if (sendto(sock, payload, sizeof(payload), 0, (struct sockaddr*)&sa, sizeof(sa)) < 0)
-			err(1, "sendto");
+	if (sendto(sock, payload, sizeof(payload), 0, (struct sockaddr*)&sa, sizeof(sa)) == -1)
+		err(1, "sendto");
 
-	close(sock);
+	(void)close(sock);
 }
 
 int
 main(int argc, char *argv[]) {
-	if (argc < 2) {
-		fprintf(stderr, "Usage: %s MAC_ADDRESS...\n", argv[0]);
-		exit(1);
-	}
+	if (argc < 2)
+		errx(1, "Usage: %s lladdr...", getprogname());
 
 	for (int i = 1; i < argc; i++)
 		wake_on_lan(argv[i]);
