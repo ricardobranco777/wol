@@ -67,9 +67,9 @@ wake_on_lan(const char *target) {
 		memcpy(payload + i, mac, 6);
 
 	memset(&sa, 0, sizeof(sa));
+	sa.sin_addr.s_addr = INADDR_BROADCAST;
 	sa.sin_family = AF_INET;
 	sa.sin_port = htons(9);
-	inet_pton(AF_INET, "255.255.255.255", &sa.sin_addr);
 
 	if ((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
 		err(1, "socket");
