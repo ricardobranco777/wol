@@ -30,6 +30,11 @@
 
 #define PORT	60000
 
+#ifdef linux
+extern char *__progname;
+#define getprogname()	(__progname)
+#endif
+
 union sockaddr_union {
 	struct sockaddr_in v4;
 	struct sockaddr_in6 v6;
@@ -81,12 +86,12 @@ main(int argc, char *argv[])
 			family = AF_INET6;
 			break;
 		default:
-			errx(1, USAGE, argv[0]);
+			errx(1, USAGE, getprogname());
 		}
 	}
 
 	if (optind >= argc)
-		errx(1, USAGE, argv[0]);
+		errx(1, USAGE, getprogname());
 	target = argv[optind];
 
 	memset(&hints, 0, sizeof(hints));
