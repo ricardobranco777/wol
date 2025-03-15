@@ -17,6 +17,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <ifaddrs.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +35,29 @@ union sockaddr_union {
 	struct sockaddr_in6 v6;
 };
 
+static const char *
+get_interface_name(const struct ifaddrs *ifaddr, int family, union sockaddr_union *source)
+{
+	const struct ifaddrs *ifa;
+
+	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr == NULL || ifa->ifa_addr->sa_family != family)
+			continue;
+
+		if (family == AF_INET) {
+			struct sockaddr_in *addr = (struct sockaddr_in *)ifa->ifa_addr;
+			if (memcmp(&addr->sin_addr, &source->v4.sin_addr, sizeof(struct in_addr)) == 0)
+				return ifa->ifa_name;
+		} else if (family == AF_INET6) {
+			struct sockaddr_in6 *addr = (struct sockaddr_in6 *)ifa->ifa_addr;
+			if (memcmp(&addr->sin6_addr, &source->v6.sin6_addr, sizeof(struct in6_addr)) == 0)
+				return ifa->ifa_name;
+		}
+	}
+
+	return "unknown";
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -45,6 +69,8 @@ main(int argc, char *argv[])
 	int opt, error, sock;
 	socklen_t namelen;
 	char *target;
+	struct ifaddrs *ifaddr;
+	const char *ifname;
 
 	while ((opt = getopt(argc, argv, "46")) != -1) {
 		switch (opt) {
@@ -69,6 +95,9 @@ main(int argc, char *argv[])
 
 	if ((error = getaddrinfo(target, NULL, &hints, &res)) != 0)
 		errx(1, "getaddrinfo: %s: %s", target, gai_strerror(error));
+
+	if (getifaddrs(&ifaddr) == -1)
+		err(1, "getifaddrs");
 
 	for (ai = res; ai != NULL; ai = ai->ai_next) {
 		memset(&remote, 0, sizeof(remote));
@@ -107,9 +136,11 @@ main(int argc, char *argv[])
 		    source_addr, sizeof(source_addr)) == NULL)
 			err(1, "inet_ntop");
 
-		printf("%s (%s) via %s\n", target, target_addr, source_addr);
+		ifname = get_interface_name(ifaddr, ai->ai_family, &source);
+		printf("%s %s via %s %s\n", target, target_addr, ifname, source_addr);
 	}
 
+	freeifaddrs(ifaddr);
 	freeaddrinfo(res);
 	return (0);
 }
