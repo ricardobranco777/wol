@@ -9,7 +9,7 @@
 #include <net/ethernet.h>
 #define	ether_addr_octet octet
 #elif defined(__sun__)
-#include <net/ethernet.h>
+#include <sys/ethernet.h>
 #elif defined(__NetBSD__)
 #include <net/if.h>
 #include <net/if_ether.h>

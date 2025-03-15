@@ -5,7 +5,7 @@ LDFLAGS	=
 
 OSTYPE	!= uname
 ifeq ($(OSTYPE),SunOS)
-LDFLAGS	+= -lsocket
+LDFLAGS	+= -lsocket -lnsl
 endif
 
 $(BIN):	$(BIN).c
