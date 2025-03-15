@@ -21,4 +21,4 @@ install:
 
 .PHONY: uninstall
 uninstall:
-	rm -f /usr/local/bin/$(BIN) 2>/dev/null || rm -f $(HOME)/bin/$(BIN)
+	$(RM) /usr/local/bin/$(BIN) 2>/dev/null || $(RM) $(HOME)/bin/$(BIN)
