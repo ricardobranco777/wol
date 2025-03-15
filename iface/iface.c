@@ -83,10 +83,11 @@ main(int argc, char *argv[])
 		if ((sock = socket(ai->ai_family, SOCK_DGRAM, 0)) == -1)
 			err(1, "socket");
 		if (connect(sock, (struct sockaddr *)&remote, ai->ai_addrlen) == -1) {
-			if (errno != EHOSTUNREACH)
+			if (errno == EHOSTUNREACH || errno == ENETUNREACH) {
+				(void)close(sock);
+				continue;
+			} else
 				err(1, "connect");
-			(void)close(sock);
-			continue;
 		}
 
 		namelen = ai->ai_addrlen;
