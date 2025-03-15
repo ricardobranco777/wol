@@ -31,40 +31,32 @@ extern char *__progname;
 #define getprogname()   (__progname)
 #endif
 
-static int
-resolve_mac(const char *input, uint8_t *mac)
+static struct ether_addr *
+resolve_mac(const char *name)
 {
-	struct ether_addr *eth;
+	static struct ether_addr ea;
 
-	struct ether_addr eth_resolved;
-	if (ether_hostton(input, &eth_resolved) == 0) {
-		memcpy(mac, eth_resolved.ether_addr_octet, 6);
-		return 0;
-	}
+	if (ether_hostton(name, &ea) == 0)
+		return &ea;
 
-	if ((eth = ether_aton(input)) != NULL) {
-		memcpy(mac, eth->ether_addr_octet, 6);
-		return 0;
-	}
-
-	return -1;
+	return ether_aton(name);
 }
 
 static void
 wake_on_lan(const char *target) {
+	struct ether_addr *mac;
 	struct sockaddr_in sa;
 	uint8_t payload[102];
-	uint8_t mac[6];
 	unsigned int i;
 	int on = 1;
 	int sock;
 
-	if (resolve_mac(target, mac) == -1)
+	if ((mac = resolve_mac(target)) == NULL)
 		errx(1, "Invalid MAC address or hostname: %s", target);
 
 	memset(payload, 0xFF, 6);
 	for (i = 6; i < sizeof(payload); i += 6)
-		memcpy(payload + i, mac, 6);
+		memcpy(payload + i, mac->ether_addr_octet, 6);
 
 	memset(&sa, 0, sizeof(sa));
 	sa.sin_addr.s_addr = INADDR_BROADCAST;
@@ -77,8 +69,7 @@ wake_on_lan(const char *target) {
 	if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof(int)) == -1)
 		err(1, "setsockopt");
 
-	printf("Sending to %02x:%02x:%02x:%02x:%02x:%02x\n",
-		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+	printf("Sending to %s\n", ether_ntoa(mac));
 
 	if (sendto(sock, payload, sizeof(payload), 0, (struct sockaddr*)&sa, sizeof(sa)) == -1)
 		err(1, "sendto");
