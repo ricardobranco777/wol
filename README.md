@@ -4,5 +4,5 @@ Wake on LAN
 ## Usage
 
 ```
-usage: ./wol MAC_ADDRESS...
+usage: ./wol lladdr...
 ```
