@@ -11,6 +11,7 @@
 #define	ether_addr_octet octet
 #elif defined(__sun__)
 #include <sys/ethernet.h>
+#include <sys/sockio.h>
 #elif defined(__NetBSD__)
 #include <net/if_ether.h>
 #elif defined(__OpenBSD__)
