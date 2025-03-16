@@ -131,7 +131,7 @@ int
 main(int argc, char *argv[]) {
 	char ifname[IF_NAMESIZE] = {0};
 	uint8_t *password = NULL;
-	int i, opt;
+	int opt;
 
 	while ((opt = getopt(argc, argv, "i:p:")) != -1) {
 		switch (opt) {
@@ -150,8 +150,7 @@ main(int argc, char *argv[]) {
 	if (optind >= argc)
 		errx(1, USAGE, getprogname());
 
-	for (i = optind; i < argc; i++)
-		wake_on_lan(argv[i], ifname, password);
+	wake_on_lan(argv[i], ifname, password);
 
 	return (0);
 }
