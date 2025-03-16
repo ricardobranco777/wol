@@ -1,5 +1,5 @@
 BIN	= iface
-CC	?= gcc
+CC	= gcc
 CFLAGS	= -Wall -Wextra -O2
 LDFLAGS	=
 
