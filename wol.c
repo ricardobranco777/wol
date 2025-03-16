@@ -69,12 +69,30 @@ get_broadcast_address(const char *ifname)
 	return ((struct sockaddr_in *)&ifr.ifr_broadaddr)->sin_addr.s_addr;
 }
 
+static uint8_t *
+get_password(const char *str)
+{
+	static uint8_t password[6];
+	unsigned int values[6];
+	int i;
+
+	if (sscanf(str, "%2x:%2x:%2x:%2x:%2x:%2x",
+	   &values[0], &values[1], &values[2],
+	   &values[3], &values[4], &values[5]) != 6)
+		return NULL;
+
+	for (i = 0; i < 6; i++)
+		password[i] = (uint8_t)values[i];
+
+	return password;
+}
+
 static void
-wake_on_lan(const char *target, const char *ifname) {
+wake_on_lan(const char *target, const char *ifname, const uint8_t *password) {
+	uint8_t payload[102 + 6];
 	struct ether_addr *mac;
 	struct sockaddr_in sa;
-	uint8_t payload[102];
-	unsigned int i;
+	size_t size;
 	int on = 1;
 	int sock;
 
@@ -82,8 +100,13 @@ wake_on_lan(const char *target, const char *ifname) {
 		errx(1, "Invalid MAC address or hostname: %s", target);
 
 	memset(payload, 0xFF, 6);
-	for (i = 6; i < sizeof(payload); i += 6)
-		memcpy(payload + i, mac->ether_addr_octet, 6);
+	for (size = 6; size < sizeof(payload); size += 6)
+		memcpy(payload + size, mac->ether_addr_octet, 6);
+
+	if (password) {
+		memcpy(payload + 102, password, 6);
+		size += 6;
+	}
 
 	memset(&sa, 0, sizeof(sa));
 	sa.sin_addr.s_addr = get_broadcast_address(ifname);
@@ -98,7 +121,7 @@ wake_on_lan(const char *target, const char *ifname) {
 
 	printf("Sending to %s via %s\n", ether_ntoa(mac), inet_ntoa(sa.sin_addr));
 
-	if (sendto(sock, payload, sizeof(payload), 0, (struct sockaddr*)&sa, sizeof(sa)) == -1)
+	if (sendto(sock, payload, size, 0, (struct sockaddr*)&sa, sizeof(sa)) == -1)
 		err(1, "sendto");
 
 	(void)close(sock);
@@ -107,12 +130,17 @@ wake_on_lan(const char *target, const char *ifname) {
 int
 main(int argc, char *argv[]) {
 	const char *ifname = NULL;
+	uint8_t *password = NULL;
 	int i, opt;
 
-	while ((opt = getopt(argc, argv, "i:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:p:")) != -1) {
 		switch (opt) {
 		case 'i':
 			ifname = optarg;
+			break;
+		case 'p':
+			if ((password = get_password(optarg)) == NULL)
+				errx(1, "Invalid SecureOn password: %s", optarg);
 			break;
 		default:
 			errx(1, USAGE, getprogname());
@@ -123,7 +151,7 @@ main(int argc, char *argv[]) {
 		errx(1, USAGE, getprogname());
 
 	for (i = optind; i < argc; i++)
-		wake_on_lan(argv[i], ifname);
+		wake_on_lan(argv[i], ifname, password);
 
 	return (0);
 }
