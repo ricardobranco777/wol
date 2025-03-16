@@ -4,5 +4,5 @@ Wake on LAN
 ## Usage
 
 ```
-usage: ./wol lladdr...
+usage: ./wol [-i interface] lladdr...
 ```
