@@ -51,14 +51,14 @@ get_broadcast_address(const char *ifname)
 	struct ifreq ifr;
 	int sock;
 
-	if (ifname == NULL)
+	if (ifname == NULL || ifname[0] == '\0')
 		return INADDR_BROADCAST;
 
 	if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		return INADDR_BROADCAST;
 
 	memset(&ifr, 0, sizeof(ifr));
-	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name) - 1);
+	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 
 	if (ioctl(sock, SIOCGIFBRDADDR, &ifr) == -1) {
 		(void)close(sock);
@@ -129,14 +129,14 @@ wake_on_lan(const char *target, const char *ifname, const uint8_t *password) {
 
 int
 main(int argc, char *argv[]) {
-	const char *ifname = NULL;
+	char ifname[IF_NAMESIZE] = {0};
 	uint8_t *password = NULL;
 	int i, opt;
 
 	while ((opt = getopt(argc, argv, "i:p:")) != -1) {
 		switch (opt) {
 		case 'i':
-			ifname = optarg;
+			strlcpy(ifname, optarg, sizeof(ifname));
 			break;
 		case 'p':
 			if ((password = get_password(optarg)) == NULL)
