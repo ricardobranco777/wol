@@ -32,7 +32,7 @@ extern char *__progname;
 #define getprogname()   (__progname)
 #endif
 
-#define USAGE "%s [-i interface] lladdr..."
+#define USAGE "%s [-i interface] [-p password] lladdr..."
 
 static struct ether_addr *
 resolve_mac(const char *name)
