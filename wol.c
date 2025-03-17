@@ -32,7 +32,7 @@ extern char *__progname;
 #define getprogname()   (__progname)
 #endif
 
-#define USAGE "%s [-i interface] [-p password] lladdr..."
+#define USAGE "%s [-i interface] [-P port] [-p password] lladdr..."
 
 static struct ether_addr *
 resolve_mac(const char *name)
@@ -88,10 +88,9 @@ get_password(const char *str)
 }
 
 static void
-wake_on_lan(const char *target, const char *ifname, const uint8_t *password) {
+wake_on_lan(const char *target, struct sockaddr_in sin, const uint8_t *password) {
 	uint8_t payload[102 + 6];
 	struct ether_addr *mac;
-	struct sockaddr_in sa;
 	size_t size;
 	int on = 1;
 	int sock;
@@ -108,20 +107,15 @@ wake_on_lan(const char *target, const char *ifname, const uint8_t *password) {
 		size += 6;
 	}
 
-	memset(&sa, 0, sizeof(sa));
-	sa.sin_addr.s_addr = get_broadcast_address(ifname);
-	sa.sin_family = AF_INET;
-	sa.sin_port = htons(9);
-
 	if ((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
 		err(1, "socket");
 
 	if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof(int)) == -1)
 		err(1, "setsockopt");
 
-	printf("Sending to %s via %s\n", ether_ntoa(mac), inet_ntoa(sa.sin_addr));
+	printf("Sending to %s via %s\n", ether_ntoa(mac), inet_ntoa(sin.sin_addr));
 
-	if (sendto(sock, payload, size, 0, (struct sockaddr*)&sa, sizeof(sa)) == -1)
+	if (sendto(sock, payload, size, 0, (struct sockaddr*)&sin, sizeof(sin)) == -1)
 		err(1, "sendto");
 
 	(void)close(sock);
@@ -131,13 +125,23 @@ int
 main(int argc, char *argv[]) {
 	char ifname[IF_NAMESIZE] = {0};
 	uint8_t *password = NULL;
+	struct sockaddr_in sin;
+	uint16_t port = 9;
 	int i, opt;
 
-	while ((opt = getopt(argc, argv, "i:p:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:P:p:")) != -1) {
 		switch (opt) {
 		case 'i':
 			strlcpy(ifname, optarg, sizeof(ifname));
 			break;
+		case 'P': {
+			char *endptr;
+			unsigned long n = strtoul(optarg, &endptr, 10);
+			if (*endptr != '\0' || n > 65535)
+				errx(1, "Invalid port: %s", optarg);
+			port = (uint16_t)n;
+			break;
+		}
 		case 'p':
 			if ((password = get_password(optarg)) == NULL)
 				errx(1, "Invalid SecureOn password: %s", optarg);
@@ -150,8 +154,13 @@ main(int argc, char *argv[]) {
 	if (optind >= argc)
 		errx(1, USAGE, getprogname());
 
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_addr.s_addr = get_broadcast_address(ifname);
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(port);
+
 	for (i = optind; i < argc; i++)
-		wake_on_lan(argv[i], ifname, password);
+		wake_on_lan(argv[i], sin, password);
 
 	return (0);
 }
