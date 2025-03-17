@@ -103,7 +103,7 @@ wake_on_lan(const char *target, const char *ifname, const uint8_t *password) {
 	for (size = 6; size < sizeof(payload); size += 6)
 		memcpy(payload + size, mac->ether_addr_octet, 6);
 
-	if (password) {
+	if (password != NULL) {
 		memcpy(payload + 102, password, 6);
 		size += 6;
 	}
