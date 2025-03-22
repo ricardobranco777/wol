@@ -68,7 +68,6 @@ static in_addr_t
 get_broadcast_address2(const char *ifaddr, const struct ifaddrs *ifaddrs)
 {
 	unsigned int valid_flags = IFF_UP | IFF_RUNNING | IFF_BROADCAST;
-	in_addr_t broadcast_addr = INADDR_BROADCAST;
 	const struct ifaddrs *ifa;
 	struct in_addr addr;
 	int rc;
@@ -83,13 +82,11 @@ get_broadcast_address2(const char *ifaddr, const struct ifaddrs *ifaddrs)
 		    (ifa->ifa_flags & valid_flags) != valid_flags ||
 		    ifa->ifa_broadaddr == NULL)
 			continue;
-		if (((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr == addr.s_addr) {
-			broadcast_addr = ((struct sockaddr_in *)ifa->ifa_broadaddr)->sin_addr.s_addr;
-			break;
-		}
+		if (((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr == addr.s_addr)
+			return ((struct sockaddr_in *)ifa->ifa_broadaddr)->sin_addr.s_addr;
 	}
 
-	return broadcast_addr;
+	return INADDR_BROADCAST;
 }
 
 /*
@@ -163,7 +160,7 @@ get_password(const char *str)
 }
 
 static void
-wake_on_lan(struct ether_addr *mac, struct sockaddr_in sin, const uint8_t *password) {
+wake(const struct ether_addr *mac, struct sockaddr_in sin, const uint8_t *password) {
 	uint8_t payload[102 + ETHER_ADDR_LEN];
 	char addrstr[INET_ADDRSTRLEN];
 	size_t size;
@@ -255,7 +252,7 @@ main(int argc, char *argv[]) {
 			    get_broadcast_address2(get_route(hostname), ifaddrs) :
 			    INADDR_BROADCAST;
 
-		wake_on_lan(mac, sin, password);
+		wake(mac, sin, password);
 	}
 
 	freeifaddrs(ifaddrs);
