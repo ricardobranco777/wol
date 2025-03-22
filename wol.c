@@ -55,7 +55,7 @@ get_broadcast_address(const char *ifname)
 		err(1, "socket");
 
 	memset(&ifr, 0, sizeof(ifr));
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 
 	if (ioctl(sock, SIOCGIFBRDADDR, &ifr) == -1)
 		err(1, "ioctl: %s", ifname);
@@ -210,7 +210,7 @@ main(int argc, char *argv[]) {
 	while ((opt = getopt(argc, argv, "i:P:p:")) != -1) {
 		switch (opt) {
 		case 'i':
-			strlcpy(ifname, optarg, sizeof(ifname));
+			strncpy(ifname, optarg, sizeof(ifname) - 1);
 			break;
 		case 'P': {
 			char *endptr;
