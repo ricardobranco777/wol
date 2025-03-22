@@ -3,8 +3,9 @@ wol
 wol.exe
 iface/iface
 iface/iface.exe
-*.o
-*.out
+**/*.o
+**/*.out
+**/*.d
 .depend
 .gdbinit
 
