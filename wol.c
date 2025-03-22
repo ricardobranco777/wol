@@ -160,7 +160,7 @@ get_password(const char *str)
 }
 
 static void
-wake_on_lan(struct ether_addr *mac, struct sockaddr_in sin, const uint8_t *password) {
+wake(const struct ether_addr *mac, struct sockaddr_in sin, const uint8_t *password) {
 	uint8_t payload[102 + ETHER_ADDR_LEN];
 	char addrstr[INET_ADDRSTRLEN];
 	size_t size;
@@ -252,7 +252,7 @@ main(int argc, char *argv[]) {
 			    get_broadcast_address2(get_route(hostname), ifaddrs) :
 			    INADDR_BROADCAST;
 
-		wake_on_lan(mac, sin, password);
+		wake(mac, sin, password);
 	}
 
 	freeifaddrs(ifaddrs);
