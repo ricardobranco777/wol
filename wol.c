@@ -74,7 +74,7 @@ get_broadcast_address(const char *ifname)
 }
 
 static in_addr_t
-get_broadcast_address2(const char *ascii)
+get_broadcast_address2(const char *ifaddr)
 {
 	unsigned int valid_flags = IFF_UP | IFF_RUNNING | IFF_BROADCAST;
 	in_addr_t broadcast_addr = INADDR_BROADCAST;
@@ -82,17 +82,18 @@ get_broadcast_address2(const char *ascii)
 	struct in_addr addr;
 	int rc;
 
-	if ((rc = inet_pton(AF_INET, ascii, &addr)) < 0)
-		err(1, "inet_pton: %s", ascii);
+	if ((rc = inet_pton(AF_INET, ifaddr, &addr)) < 0)
+		err(1, "inet_pton: %s", ifaddr);
 	else if (!rc)
-		errx(1, "inet_pton: %s: invalid address", ascii);
+		errx(1, "inet_pton: %s: invalid address", ifaddr);
 
 	if (getifaddrs(&ifaddrs) == -1)
 		err(1, "getifaddrs");
 
 	for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
 		if (ifa->ifa_addr->sa_family != AF_INET ||
-		    (ifa->ifa_flags & valid_flags) != valid_flags)
+		    (ifa->ifa_flags & valid_flags) != valid_flags ||
+		    ifa->ifa_broadaddr == NULL)
 			continue;
 		if (((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr == addr.s_addr) {
 			broadcast_addr = ((struct sockaddr_in *)ifa->ifa_broadaddr)->sin_addr.s_addr;
