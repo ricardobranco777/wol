@@ -59,15 +59,13 @@ get_broadcast_address(const char *ifname)
 		return INADDR_BROADCAST;
 
 	if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-		return INADDR_BROADCAST;
+		err(1, "socket");
 
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 
-	if (ioctl(sock, SIOCGIFBRDADDR, &ifr) == -1) {
-		(void)close(sock);
-		return INADDR_BROADCAST;
-	}
+	if (ioctl(sock, SIOCGIFBRDADDR, &ifr) == -1)
+		err(1, "ioctl: %s", ifname);
 
 	(void)close(sock);
 	return ((struct sockaddr_in *)&ifr.ifr_broadaddr)->sin_addr.s_addr;
