@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
+#include <ifaddrs.h>
 #if defined(__linux__)
 #include <netinet/ether.h>
 #elif defined(__FreeBSD__) || defined(__DragonFly__)
@@ -24,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <err.h>
 #include <getopt.h>
 
@@ -69,6 +71,37 @@ get_broadcast_address(const char *ifname)
 
 	(void)close(sock);
 	return ((struct sockaddr_in *)&ifr.ifr_broadaddr)->sin_addr.s_addr;
+}
+
+static in_addr_t
+get_broadcast_address2(const char *ascii)
+{
+	unsigned int valid_flags = IFF_UP | IFF_RUNNING | IFF_BROADCAST;
+	in_addr_t broadcast_addr = INADDR_BROADCAST;
+	struct ifaddrs *ifaddrs, *ifa;
+	struct in_addr addr;
+	int rc;
+
+	if ((rc = inet_pton(AF_INET, ascii, &addr)) < 0)
+		err(1, "inet_pton: %s", ascii);
+	else if (!rc)
+		errx(1, "inet_pton: %s: invalid address", ascii);
+
+	if (getifaddrs(&ifaddrs) == -1)
+		err(1, "getifaddrs");
+
+	for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr->sa_family != AF_INET ||
+		    (ifa->ifa_flags & valid_flags) != valid_flags)
+			continue;
+		if (((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr == addr.s_addr) {
+			broadcast_addr = ((struct sockaddr_in *)ifa->ifa_broadaddr)->sin_addr.s_addr;
+			break;
+		}
+	}
+
+	freeifaddrs(ifaddrs);
+	return broadcast_addr;
 }
 
 static uint8_t *
@@ -157,7 +190,9 @@ main(int argc, char *argv[]) {
 		errx(1, USAGE, getprogname());
 
 	memset(&sin, 0, sizeof(sin));
-	sin.sin_addr.s_addr = get_broadcast_address(ifname);
+	sin.sin_addr.s_addr = isdigit((int)ifname[0])
+		? get_broadcast_address2(ifname)
+		: get_broadcast_address(ifname);
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(port);
 
