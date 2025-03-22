@@ -54,7 +54,7 @@ get_broadcast_address(const char *ifname)
 	if (ifname == NULL || ifname[0] == '\0')
 		return INADDR_BROADCAST;
 
-	if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+	if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
 		return INADDR_BROADCAST;
 
 	memset(&ifr, 0, sizeof(ifr));
@@ -107,7 +107,7 @@ wake_on_lan(const char *target, struct sockaddr_in sin, const uint8_t *password)
 		size += ETHER_ADDR_LEN;
 	}
 
-	if ((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+	if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
 		err(1, "socket");
 
 	if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof(int)) == -1)
