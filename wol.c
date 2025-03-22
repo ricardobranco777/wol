@@ -1,8 +1,10 @@
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
+#include <netdb.h>
 #include <net/if.h>
 #include <ifaddrs.h>
 #if defined(__linux__)
@@ -40,17 +42,6 @@ extern char *__progname;
 
 #define USAGE "%s [-i interface] [-P port] [-p password] lladdr..."
 
-static struct ether_addr *
-resolve_mac(const char *name)
-{
-	static struct ether_addr ea;
-
-	if (ether_hostton(name, &ea) == 0)
-		return &ea;
-
-	return ether_aton(name);
-}
-
 static in_addr_t
 get_broadcast_address(const char *ifname)
 {
@@ -74,11 +65,11 @@ get_broadcast_address(const char *ifname)
 }
 
 static in_addr_t
-get_broadcast_address2(const char *ifaddr)
+get_broadcast_address2(const char *ifaddr, const struct ifaddrs *ifaddrs)
 {
 	unsigned int valid_flags = IFF_UP | IFF_RUNNING | IFF_BROADCAST;
 	in_addr_t broadcast_addr = INADDR_BROADCAST;
-	struct ifaddrs *ifaddrs, *ifa;
+	const struct ifaddrs *ifa;
 	struct in_addr addr;
 	int rc;
 
@@ -86,9 +77,6 @@ get_broadcast_address2(const char *ifaddr)
 		err(1, "inet_pton: %s", ifaddr);
 	else if (!rc)
 		errx(1, "inet_pton: %s: invalid address", ifaddr);
-
-	if (getifaddrs(&ifaddrs) == -1)
-		err(1, "getifaddrs");
 
 	for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
 		if (ifa->ifa_addr->sa_family != AF_INET ||
@@ -101,8 +89,59 @@ get_broadcast_address2(const char *ifaddr)
 		}
 	}
 
-	freeifaddrs(ifaddrs);
 	return broadcast_addr;
+}
+
+/*
+ * According to Richard W. Stevens's UNIX Network Programming Vol. 1 3rd Ed:
+ *
+ * "Calling connect on a UDP socket does not send anything to that host;
+ *  it is entirely a local operation that saves the peer's IP address and port.
+ *  We also see that calling connect on an unbound UDP socket also assigns an
+ *  ephemeral port to the socket.
+ *  Unfortunately, this technique does not work on all implementations, mostly
+ *  SVR4-derived kernels. For example, this does not work on Solaris 2.5, but it
+ *  works on AIX, HP-UX 11, MacOS X, FreeBSD, Linux, and Solaris 2.6 and later."
+ *
+ * Verified to work on Linux, FreeBSD, NetBSD, OpenBSD, DragonflyBSD & Illumos
+ */
+static char *
+get_route(const char *target)
+{
+	static char addrstr[INET_ADDRSTRLEN];
+	struct addrinfo hints, *res;
+	struct sockaddr_in sin;
+	socklen_t namelen;
+	int error;
+	int sock;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_DGRAM;
+
+	if ((error = getaddrinfo(target, NULL, &hints, &res)) != 0)
+		errx(1, "getaddrinfo: %s: %s", target, gai_strerror(error));
+
+	memcpy(&sin, res->ai_addr, sizeof(sin));
+	sin.sin_port = htons(60000);
+	freeaddrinfo(res);
+
+	if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+		err(1, "socket");
+
+	if (connect(sock, (struct sockaddr *)&sin, sizeof(sin)) == -1)
+		err(1, "connect");
+
+	namelen = sizeof(sin);
+	if (getsockname(sock, (struct sockaddr *)&sin, &namelen) == -1)
+		err(1, "getsockname");
+
+	(void)close(sock);
+
+	if (inet_ntop(AF_INET, &sin.sin_addr, addrstr, sizeof(addrstr)) == NULL)
+		err(1, "inet_ntop");
+
+	return addrstr;
 }
 
 static uint8_t *
@@ -124,15 +163,12 @@ get_password(const char *str)
 }
 
 static void
-wake_on_lan(const char *target, struct sockaddr_in sin, const uint8_t *password) {
+wake_on_lan(struct ether_addr *mac, struct sockaddr_in sin, const uint8_t *password) {
 	uint8_t payload[102 + ETHER_ADDR_LEN];
-	struct ether_addr *mac;
+	char addrstr[INET_ADDRSTRLEN];
 	size_t size;
 	int on = 1;
 	int sock;
-
-	if ((mac = resolve_mac(target)) == NULL)
-		errx(1, "Invalid MAC address or hostname: %s", target);
 
 	memset(payload, 0xFF, ETHER_ADDR_LEN);
 	for (size = ETHER_ADDR_LEN; size < sizeof(payload); size += ETHER_ADDR_LEN)
@@ -149,7 +185,10 @@ wake_on_lan(const char *target, struct sockaddr_in sin, const uint8_t *password)
 	if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof(int)) == -1)
 		err(1, "setsockopt");
 
-	printf("Sending to %s via %s\n", ether_ntoa(mac), inet_ntoa(sin.sin_addr));
+	if (inet_ntop(AF_INET, &sin.sin_addr, addrstr, sizeof(addrstr)) == NULL)
+		err(1, "inet_ntop");
+
+	printf("Sending to %s via %s\n", ether_ntoa(mac), addrstr);
 
 	if (sendto(sock, payload, size, 0, (struct sockaddr*)&sin, sizeof(sin)) == -1)
 		err(1, "sendto");
@@ -160,7 +199,10 @@ wake_on_lan(const char *target, struct sockaddr_in sin, const uint8_t *password)
 int
 main(int argc, char *argv[]) {
 	char ifname[IF_NAMESIZE] = {0};
+	char hostname[MAXHOSTNAMELEN];
+	struct ether_addr ea, *mac;
 	uint8_t *password = NULL;
+	struct ifaddrs *ifaddrs;
 	struct sockaddr_in sin;
 	uint16_t port = 9;
 	int i, opt;
@@ -190,15 +232,33 @@ main(int argc, char *argv[]) {
 	if (optind >= argc)
 		errx(1, USAGE, getprogname());
 
+	if (getifaddrs(&ifaddrs) == -1)
+		err(1, "getifaddrs");
+
 	memset(&sin, 0, sizeof(sin));
-	sin.sin_addr.s_addr = isdigit((int)ifname[0])
-		? get_broadcast_address2(ifname)
-		: get_broadcast_address(ifname);
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(port);
+	if (strcmp(ifname, "default") != 0)
+		sin.sin_addr.s_addr = isdigit((int)ifname[0]) ?
+		    get_broadcast_address2(ifname, ifaddrs) :
+		    get_broadcast_address(ifname);
 
-	for (i = optind; i < argc; i++)
-		wake_on_lan(argv[i], sin, password);
+	for (i = optind; i < argc; i++) {
+		if ((mac = ether_aton(argv[i])) == NULL) {
+			if (ether_hostton(argv[i], &ea) != 0)
+				errx(1, "Missing in /etc/ethers: %s", argv[i]);
+			mac = &ea;
+		}
+
+		if (strcmp(ifname, "default") == 0)
+			sin.sin_addr.s_addr = (ether_ntohost(hostname, mac) == 0) ?
+			    get_broadcast_address2(get_route(hostname), ifaddrs) :
+			    INADDR_BROADCAST;
+
+		wake_on_lan(mac, sin, password);
+	}
+
+	freeifaddrs(ifaddrs);
 
 	return (0);
 }
