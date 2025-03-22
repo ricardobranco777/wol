@@ -72,16 +72,16 @@ get_broadcast_address(const char *ifname)
 static uint8_t *
 get_password(const char *str)
 {
-	static uint8_t password[6];
-	unsigned int values[6];
+	static uint8_t password[ETHER_ADDR_LEN];
+	unsigned int values[ETHER_ADDR_LEN];
 	int i;
 
 	if (sscanf(str, "%2x:%2x:%2x:%2x:%2x:%2x",
 	   &values[0], &values[1], &values[2],
-	   &values[3], &values[4], &values[5]) != 6)
+	   &values[3], &values[4], &values[5]) != ETHER_ADDR_LEN)
 		return NULL;
 
-	for (i = 0; i < 6; i++)
+	for (i = 0; i < ETHER_ADDR_LEN; i++)
 		password[i] = (uint8_t)values[i];
 
 	return password;
@@ -89,7 +89,7 @@ get_password(const char *str)
 
 static void
 wake_on_lan(const char *target, struct sockaddr_in sin, const uint8_t *password) {
-	uint8_t payload[102 + 6];
+	uint8_t payload[102 + ETHER_ADDR_LEN];
 	struct ether_addr *mac;
 	size_t size;
 	int on = 1;
@@ -98,13 +98,13 @@ wake_on_lan(const char *target, struct sockaddr_in sin, const uint8_t *password)
 	if ((mac = resolve_mac(target)) == NULL)
 		errx(1, "Invalid MAC address or hostname: %s", target);
 
-	memset(payload, 0xFF, 6);
-	for (size = 6; size < sizeof(payload); size += 6)
-		memcpy(payload + size, mac->ether_addr_octet, 6);
+	memset(payload, 0xFF, ETHER_ADDR_LEN);
+	for (size = ETHER_ADDR_LEN; size < sizeof(payload); size += ETHER_ADDR_LEN)
+		memcpy(payload + size, mac->ether_addr_octet, ETHER_ADDR_LEN);
 
 	if (password != NULL) {
-		memcpy(payload + 102, password, 6);
-		size += 6;
+		memcpy(payload + 102, password, ETHER_ADDR_LEN);
+		size += ETHER_ADDR_LEN;
 	}
 
 	if ((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
