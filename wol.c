@@ -27,6 +27,10 @@
 #include <err.h>
 #include <getopt.h>
 
+#ifndef ETHER_ADDR_LEN
+#define ETHER_ADDR_LEN	6
+#endif
+
 #ifdef __linux__
 extern char *__progname;
 #define getprogname()   (__progname)
