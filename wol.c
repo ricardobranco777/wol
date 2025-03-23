@@ -27,10 +27,6 @@
 #include <err.h>
 #include <getopt.h>
 
-#ifndef ETHER_ADDR_LEN
-#define ETHER_ADDR_LEN	6
-#endif
-
 #ifdef __linux__
 extern char *__progname;
 #define getprogname()   (__progname)
@@ -63,16 +59,16 @@ get_broadcast_address(const char *ifname)
 static uint8_t *
 get_password(const char *str)
 {
-	static uint8_t password[ETHER_ADDR_LEN];
-	unsigned int values[ETHER_ADDR_LEN];
+	static uint8_t password[6];
+	unsigned int values[6];
 	int i;
 
 	if (sscanf(str, "%2x:%2x:%2x:%2x:%2x:%2x",
 	   &values[0], &values[1], &values[2],
-	   &values[3], &values[4], &values[5]) != ETHER_ADDR_LEN)
+	   &values[3], &values[4], &values[5]) != 6)
 		return NULL;
 
-	for (i = 0; i < ETHER_ADDR_LEN; i++)
+	for (i = 0; i < 6; i++)
 		password[i] = (uint8_t)values[i];
 
 	return password;
@@ -80,19 +76,18 @@ get_password(const char *str)
 
 static void
 wake(const struct ether_addr *mac, struct sockaddr_in sin, const uint8_t *password) {
-	uint8_t payload[102 + ETHER_ADDR_LEN];
-	char addrstr[INET_ADDRSTRLEN];
+	uint8_t payload[102 + 6];
 	size_t size;
 	int on = 1;
 	int sock;
 
-	memset(payload, 0xFF, ETHER_ADDR_LEN);
-	for (size = ETHER_ADDR_LEN; size < sizeof(payload); size += ETHER_ADDR_LEN)
-		memcpy(payload + size, mac->ether_addr_octet, ETHER_ADDR_LEN);
+	memset(payload, 0xFF, 6);
+	for (size = 6; size < sizeof(payload); size += 6)
+		memcpy(payload + size, mac->ether_addr_octet, 6);
 
 	if (password != NULL) {
-		memcpy(payload + 102, password, ETHER_ADDR_LEN);
-		size += ETHER_ADDR_LEN;
+		memcpy(payload + 102, password, 6);
+		size += 6;
 	}
 
 	if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
@@ -101,10 +96,7 @@ wake(const struct ether_addr *mac, struct sockaddr_in sin, const uint8_t *passwo
 	if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof(int)) == -1)
 		err(1, "setsockopt");
 
-	if (inet_ntop(AF_INET, &sin.sin_addr, addrstr, sizeof(addrstr)) == NULL)
-		err(1, "inet_ntop");
-
-	printf("Sending to %s via %s\n", ether_ntoa(mac), addrstr);
+	printf("Sending to %s via %s\n", ether_ntoa(mac), inet_ntoa(sin.sin_addr));
 
 	if (sendto(sock, payload, size, 0, (struct sockaddr*)&sin, sizeof(sin)) == -1)
 		err(1, "sendto");
