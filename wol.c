@@ -1,10 +1,8 @@
 #include <sys/types.h>
-#include <sys/param.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
-#include <netdb.h>
 #include <net/if.h>
 #include <ifaddrs.h>
 #if defined(__linux__)
@@ -89,58 +87,6 @@ get_broadcast_address2(const char *ifaddr, const struct ifaddrs *ifaddrs)
 	return INADDR_BROADCAST;
 }
 
-/*
- * According to Richard W. Stevens's UNIX Network Programming Vol. 1 3rd Ed:
- *
- * "Calling connect on a UDP socket does not send anything to that host;
- *  it is entirely a local operation that saves the peer's IP address and port.
- *  We also see that calling connect on an unbound UDP socket also assigns an
- *  ephemeral port to the socket.
- *  Unfortunately, this technique does not work on all implementations, mostly
- *  SVR4-derived kernels. For example, this does not work on Solaris 2.5, but it
- *  works on AIX, HP-UX 11, MacOS X, FreeBSD, Linux, and Solaris 2.6 and later."
- *
- * Verified to work on Linux, FreeBSD, NetBSD, OpenBSD, DragonflyBSD & Illumos
- */
-static char *
-get_route(const char *target)
-{
-	static char addrstr[INET_ADDRSTRLEN];
-	struct addrinfo hints, *res;
-	struct sockaddr_in sin;
-	socklen_t namelen;
-	int error;
-	int sock;
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-
-	if ((error = getaddrinfo(target, NULL, &hints, &res)) != 0)
-		errx(1, "getaddrinfo: %s: %s", target, gai_strerror(error));
-
-	memcpy(&sin, res->ai_addr, sizeof(sin));
-	sin.sin_port = htons(60000);
-	freeaddrinfo(res);
-
-	if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-		err(1, "socket");
-
-	if (connect(sock, (struct sockaddr *)&sin, sizeof(sin)) == -1)
-		err(1, "connect");
-
-	namelen = sizeof(sin);
-	if (getsockname(sock, (struct sockaddr *)&sin, &namelen) == -1)
-		err(1, "getsockname");
-
-	(void)close(sock);
-
-	if (inet_ntop(AF_INET, &sin.sin_addr, addrstr, sizeof(addrstr)) == NULL)
-		err(1, "inet_ntop");
-
-	return addrstr;
-}
-
 static uint8_t *
 get_password(const char *str)
 {
@@ -196,7 +142,6 @@ wake(const struct ether_addr *mac, struct sockaddr_in sin, const uint8_t *passwo
 int
 main(int argc, char *argv[]) {
 	char ifname[IF_NAMESIZE] = {0};
-	char hostname[MAXHOSTNAMELEN];
 	struct ether_addr ea, *mac;
 	uint8_t *password = NULL;
 	struct ifaddrs *ifaddrs;
@@ -235,10 +180,9 @@ main(int argc, char *argv[]) {
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(port);
-	if (strcmp(ifname, "default") != 0)
-		sin.sin_addr.s_addr = isdigit((int)ifname[0]) ?
-		    get_broadcast_address2(ifname, ifaddrs) :
-		    get_broadcast_address(ifname);
+	sin.sin_addr.s_addr = isdigit((int)ifname[0]) ?
+	    get_broadcast_address2(ifname, ifaddrs) :
+	    get_broadcast_address(ifname);
 
 	for (i = optind; i < argc; i++) {
 		if ((mac = ether_aton(argv[i])) == NULL) {
@@ -246,11 +190,6 @@ main(int argc, char *argv[]) {
 				errx(1, "Missing in /etc/ethers: %s", argv[i]);
 			mac = &ea;
 		}
-
-		if (strcmp(ifname, "default") == 0)
-			sin.sin_addr.s_addr = (ether_ntohost(hostname, mac) == 0) ?
-			    get_broadcast_address2(get_route(hostname), ifaddrs) :
-			    INADDR_BROADCAST;
 
 		wake(mac, sin, password);
 	}
