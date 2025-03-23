@@ -4,7 +4,6 @@
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
-#include <ifaddrs.h>
 #if defined(__linux__)
 #include <netinet/ether.h>
 #elif defined(__FreeBSD__) || defined(__DragonFly__)
@@ -25,7 +24,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <ctype.h>
 #include <err.h>
 #include <getopt.h>
 
@@ -60,31 +58,6 @@ get_broadcast_address(const char *ifname)
 
 	(void)close(sock);
 	return ((struct sockaddr_in *)&ifr.ifr_broadaddr)->sin_addr.s_addr;
-}
-
-static in_addr_t
-get_broadcast_address2(const char *ifaddr, const struct ifaddrs *ifaddrs)
-{
-	unsigned int valid_flags = IFF_UP | IFF_RUNNING | IFF_BROADCAST;
-	const struct ifaddrs *ifa;
-	struct in_addr addr;
-	int rc;
-
-	if ((rc = inet_pton(AF_INET, ifaddr, &addr)) < 0)
-		err(1, "inet_pton: %s", ifaddr);
-	else if (!rc)
-		errx(1, "inet_pton: %s: invalid address", ifaddr);
-
-	for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
-		if (ifa->ifa_addr->sa_family != AF_INET ||
-		    (ifa->ifa_flags & valid_flags) != valid_flags ||
-		    ifa->ifa_broadaddr == NULL)
-			continue;
-		if (((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr == addr.s_addr)
-			return ((struct sockaddr_in *)ifa->ifa_broadaddr)->sin_addr.s_addr;
-	}
-
-	return INADDR_BROADCAST;
 }
 
 static uint8_t *
@@ -144,7 +117,6 @@ main(int argc, char *argv[]) {
 	char ifname[IF_NAMESIZE] = {0};
 	struct ether_addr ea, *mac;
 	uint8_t *password = NULL;
-	struct ifaddrs *ifaddrs;
 	struct sockaddr_in sin;
 	uint16_t port = 9;
 	int i, opt;
@@ -174,15 +146,10 @@ main(int argc, char *argv[]) {
 	if (optind >= argc)
 		errx(1, USAGE, getprogname());
 
-	if (getifaddrs(&ifaddrs) == -1)
-		err(1, "getifaddrs");
-
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(port);
-	sin.sin_addr.s_addr = isdigit((int)ifname[0]) ?
-	    get_broadcast_address2(ifname, ifaddrs) :
-	    get_broadcast_address(ifname);
+	sin.sin_addr.s_addr = get_broadcast_address(ifname);
 
 	for (i = optind; i < argc; i++) {
 		if ((mac = ether_aton(argv[i])) == NULL) {
@@ -193,8 +160,6 @@ main(int argc, char *argv[]) {
 
 		wake(mac, sin, password);
 	}
-
-	freeifaddrs(ifaddrs);
 
 	return (0);
 }
