@@ -9,7 +9,8 @@
  *  SVR4-derived kernels. For example, this does not work on Solaris 2.5, but it
  *  works on AIX, HP-UX 11, MacOS X, FreeBSD, Linux, and Solaris 2.6 and later."
  *
- * Verified to work on Linux, FreeBSD, NetBSD, OpenBSD, DragonflyBSD & Illumos
+ * Verified to work on Linux, FreeBSD, NetBSD, OpenBSD, DragonflyBSD, Illumos &
+ * MacOSX
  */
 
 #include <sys/types.h>
