@@ -15,6 +15,7 @@ Tested on:
 - OpenBSD
 - DragonflyBSD
 - MidnightBSD
+- MacOS X
 
 # Notes
 

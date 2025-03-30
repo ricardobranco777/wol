@@ -6,7 +6,7 @@
 #include <net/if.h>
 #if defined(__linux__)
 #include <netinet/ether.h>
-#elif defined(__FreeBSD__) || defined(__DragonFly__)
+#elif defined(__FreeBSD__) || defined(__DragonFly__) || defined(__APPLE__)
 #include <net/ethernet.h>
 #define	ether_addr_octet octet
 #elif defined(__sun__)
