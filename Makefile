@@ -5,7 +5,6 @@ WARNINGS= yes
 CFLAGS+= -O2
 
 MK_DEBUG_FILES=	no
-MAN=
 
 .if ${OPSYS} == "NetBSD"
 BINDIR= /usr/pkg/bin
