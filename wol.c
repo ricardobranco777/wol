@@ -75,7 +75,8 @@ get_password(const char *str)
 }
 
 static void
-wake(struct ether_addr *mac, struct sockaddr_in sin, const uint8_t *password) {
+wake(struct ether_addr *mac, struct sockaddr_in sin, const uint8_t *password)
+{
 	uint8_t payload[102 + 6];
 	size_t size;
 	int on = 1;
@@ -105,7 +106,8 @@ wake(struct ether_addr *mac, struct sockaddr_in sin, const uint8_t *password) {
 }
 
 int
-main(int argc, char *argv[]) {
+main(int argc, char *argv[])
+{
 	char ifname[IF_NAMESIZE] = {0};
 	struct ether_addr ea, *mac;
 	uint8_t *password = NULL;
