@@ -1,6 +1,8 @@
 # wol
 Wake on LAN
 
+Moved to https://github.com/ricardobranco777/unixtools
+
 ## Usage
 
 ```
